@@ -1,27 +1,21 @@
 //James Kerester and Molly Croke
-void printChar(int*);
+void printChar(char);
 void printString(char*);
 void readString(char*);
 void handleInterrupt21(int, int, int, int);
 void readSector(char*, int);
 void readFile(char*, char*,  int*);
+void executeProgram(char*);
+void terminate();
 main()
 {
+	makeInterrupt21();
+	interrupt(0x21, 4, "shell", 0, 0);
 
-	char buffer[13312];   /*this is the maximum size of a file*/
-	int sectorsRead;
-	makeInterrupt21(); 
-	interrupt(0x21, 3, "messag", buffer, &sectorsRead);   /*read the file into buffer*/ 
-
-	if (sectorsRead>0){
-		interrupt(0x21, 0, buffer, 0, 0);   /*print out the file*/ 	
-	}else{
-		interrupt(0x21, 0, "messag not found\r\n", 0, 0);  /*no sectors read? then print an error*/
-	}
 	while(1);   /*hang up*/ 
 }
 //debugging function
-void printChar(int* c)
+void printChar(char c)
 {
 	interrupt(0x10, 0xe*256 + c, 0, 0, 0);
 }
@@ -89,8 +83,12 @@ void handleInterrupt21( int ax, int bx, int cx, int dx)
 		readSector(bx, cx);
 	}else if (ax == 3){
 		readFile(bx, cx, dx);
+	}else if(ax == 4){
+		executeProgram(bx);
+	}else if(ax == 5){
+		terminate();
 	}else {
-	printString("Error, ax should be less than 4");
+	printString("Error, ax should be less than 6");
 	}
 }
 
@@ -124,7 +122,34 @@ void readFile(char* name, char* buffer, int* sectorsRead)
 	}
 }
 
+void executeProgram(char* name)
+{
+	int sectorsRead;
+	char buffer[13312];
+	int address;
+	readFile(name, buffer, &sectorsRead);
 
+	//this prevents trying to execute a file that doesn't exist
+	if(sectorsRead > 0)
+	{
+		for(address = 0; address < 13312; address++)
+		{
+			putInMemory(0x2000, address, buffer[address]);
+		}
+		launchProgram(0x2000);
+	}
+}
 
-
+void terminate()
+{
+	char shell[6];
+	shell[0] = 's';
+	shell[1] = 'h';
+	shell[2] = 'e';
+	shell[3] = 'l';
+	shell[4] = 'l';
+	shell[5] = '\0';
+	executeProgram(shell);
+	while(1);
+}
 
